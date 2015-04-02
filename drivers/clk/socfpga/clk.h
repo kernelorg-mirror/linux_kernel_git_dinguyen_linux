@@ -34,10 +34,14 @@
 	((((smplsel) & 0x7) << 3) | (((drvsel) & 0x7) << 0))
 
 extern void __iomem *clk_mgr_base_addr;
+extern void __iomem *clk_mgr_a10_base_addr;
 
 void __init socfpga_pll_init(struct device_node *node);
 void __init socfpga_periph_init(struct device_node *node);
 void __init socfpga_gate_init(struct device_node *node);
+void __init socfpga_a10_pll_init(struct device_node *node);
+void __init socfpga_a10_periph_init(struct device_node *node);
+void __init socfpga_a10_gate_init(struct device_node *node);
 
 struct socfpga_pll {
 	struct clk_gate	hw;
