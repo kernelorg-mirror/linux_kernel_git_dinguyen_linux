@@ -1,0 +1,79 @@
+# SPDX-License-Identifier: GPL-2.0
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/clock/intc,agilex.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Intel SoCFPGA Agilex platform clock controller binding
+
+maintainers:
+  - Dinh Nguyen <dinguyen@kernel.org>
+
+description: |
+  The Intel Agilex Clock controller is an integrated clock controller, which
+  generates and supplies to all modules.
+
+  This binding uses the common clock binding[1].
+  [1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+
+properties:
+  compatible:
+    oneOf:
+      - items:
+          - enum:
+              - intel,agilex-clkmgr
+
+  '#clock-cells':
+    const: 1
+
+required:
+  - compatible
+  - reg
+  - '#clock-cells'
+
+examples:
+  # Clock controller node
+  - |
+	clkmgr: clock-controller@ffd10000 {
+		compatible = "intel,agilex-clkmgr";
+		reg = <0xffd10000 0x1000>;
+		#clock-cells = <1>;
+	};
+
+  # External clocks
+  - |
+    clocks {
+       cb_intosc_hs_div2_clk: cb-intosc-hs-div2-clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		};
+
+	cb_intosc_ls_clk: cb-intosc-ls-clk {
+		#clock-cells = <0>;
+			compatible = "fixed-clock";
+		};
+
+	f2s_free_clk: f2s-free-clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		};
+
+	osc1: osc1 {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+	};
+    };
+
+  # The clock consumer shall specify the desired clock-output of the clock
+  # controller as below by specifying output-id in its "clk" phandle cell.
+  - |
+    i2c0: i2c@ffc02800 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	compatible = "snps,designware-i2c";
+	reg = <0xffc02800 0x100>;
+	interrupts = <0 103 4>;
+	resets = <&rst I2C0_RESET>;
+	clocks = <&clkmgr AGILEX_L4_SP_CLK>;
+	};
+...
