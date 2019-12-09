@@ -255,11 +255,9 @@ static struct stratix10_clock_data *__socfpga_s10_clk_init(struct platform_devic
 	struct device *dev = &pdev->dev;
 	struct stratix10_clock_data *clk_data;
 	struct clk **clk_table;
-	struct resource *res;
 	void __iomem *base;
 
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	base = devm_ioremap_resource(dev, res);
+	base = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(base)) {
 		pr_err("%s: failed to map clock registers\n", __func__);
 		return ERR_CAST(base);
