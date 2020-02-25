@@ -12,35 +12,87 @@
 
 #include "stratix10-clk.h"
 
-static const char * const pll_mux[] = { "osc1", "cb-intosc-hs-div2-clk",
-					"f2s-free-clk",};
-static const char * const cntr_mux[] = { "main_pll", "periph_pll",
-					 "osc1", "cb-intosc-hs-div2-clk",
-					 "f2s-free-clk"};
-static const char * const boot_mux[] = { "osc1", "cb-intosc-hs-div2-clk",};
+static const struct clk_parent_data pll_mux[] = {
+	{ .name = "osc1" },
+	{ .name = "cb-intosc-hs-div2-clk" },
+	{ .name = "f2s-free-clk" },
+};
 
-static const char * const noc_free_mux[] = {"main_noc_base_clk",
-					    "peri_noc_base_clk",
-					    "osc1", "cb-intosc-hs-div2-clk",
-					    "f2s-free-clk"};
+static const struct clk_parent_data cntr_mux[] = {
+	{ .name = "main_pll", },
+	{ .name = "periph_pll", },
+	{ .name = "osc1", },
+	{ .name = "cb-intosc-hs-div2-clk", },
+	{ .name = "f2s-free-clk", },
+};
 
-static const char * const emaca_free_mux[] = {"peri_emaca_clk", "boot_clk"};
-static const char * const emacb_free_mux[] = {"peri_emacb_clk", "boot_clk"};
-static const char * const emac_ptp_free_mux[] = {"peri_emac_ptp_clk", "boot_clk"};
-static const char * const gpio_db_free_mux[] = {"peri_gpio_db_clk", "boot_clk"};
-static const char * const sdmmc_free_mux[] = {"main_sdmmc_clk", "boot_clk"};
-static const char * const s2f_usr1_free_mux[] = {"peri_s2f_usr1_clk", "boot_clk"};
-static const char * const psi_ref_free_mux[] = {"peri_psi_ref_clk", "boot_clk"};
-static const char * const mpu_mux[] = { "mpu_free_clk", "boot_clk",};
+static const struct clk_parent_data boot_mux[] = {
+	{ .name = "osc1" },
+	{ .name = "cb-intosc-hs-div2-clk" },
+};
 
-static const char * const s2f_usr0_mux[] = {"f2s-free-clk", "boot_clk"};
-static const char * const emac_mux[] = {"emaca_free_clk", "emacb_free_clk"};
-static const char * const noc_mux[] = {"noc_free_clk", "boot_clk"};
+static const struct clk_parent_data noc_free_mux[] = {
+	{ .name = "main_noc_base_clk", },
+	{ .name = "peri_noc_base_clk", },
+	{ .name = "osc1", },
+	{ .name = "cb-intosc-hs-div2-clk", },
+	{ .name = "f2s-free-clk", },
+};
 
-static const char * const mpu_free_mux[] = {"main_mpu_base_clk",
-					    "peri_mpu_base_clk",
-					    "osc1", "cb-intosc-hs-div2-clk",
-					    "f2s-free-clk"};
+static const struct clk_parent_data emaca_free_mux[] = {
+	{ .name = "peri_emaca_clk", },
+	{ .name = "boot_clk", },
+};
+
+static const struct clk_parent_data emacb_free_mux[] = {
+	{ .name = "peri_emacb_clk", },
+	{ .name = "boot_clk", },
+};
+static const struct clk_parent_data emac_ptp_free_mux[] = {
+	{ .name = "peri_emac_ptp_clk", },
+	{ .name = "boot_clk", },
+};
+static const struct clk_parent_data gpio_db_free_mux[] = {
+	{ .name = "peri_gpio_db_clk", },
+	{ .name = "boot_clk", },
+};
+static const struct clk_parent_data sdmmc_free_mux[] = {
+	{ .name = "main_sdmmc_clk", },
+	{ .name = "boot_clk", },
+};
+static const struct clk_parent_data s2f_usr1_free_mux[] = {
+	{ .name = "peri_s2f_usr1_clk", },
+	{ .name = "boot_clk", },
+};
+static const struct clk_parent_data psi_ref_free_mux[] = {
+	{ .name = "peri_psi_ref_clk", },
+	{ .name = "boot_clk", },
+};
+static const struct clk_parent_data mpu_mux[] = {
+	{ .name = "mpu_free_clk", },
+	{ .name = "boot_clk", },
+};
+
+static const struct clk_parent_data s2f_usr0_mux[] = {
+	{ .name = "f2s-free-clk", },
+	{ .name = "boot_clk", },
+};
+static const struct clk_parent_data emac_mux[] = {
+	{ .name = "emaca_free_clk", },
+	{ .name = "emacb_free_clk", },
+};
+static const struct clk_parent_data noc_mux[] = {
+	{ .name = "noc_free_clk", },
+	{ .name = "boot_clk", },
+};
+
+static const struct clk_parent_data mpu_free_mux[] = {
+	{ .name = "main_mpu_base_clk", },
+	{ .name = "peri_mpu_base_clk", },
+	{ .name = "osc1", },
+	{ .name = "cb-intosc-hs-div2-clk", },
+	{ .name = "f2s-free-clk", },
+};
 
 /* clocks in AO (always on) controller */
 static const struct stratix10_pll_clock s10_pll_clks[] = {
