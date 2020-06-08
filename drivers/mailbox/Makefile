@@ -9,6 +9,8 @@ obj-$(CONFIG_ARM_MHU)	+= arm_mhu.o
 
 obj-$(CONFIG_IMX_MBOX)	+= imx-mailbox.o
 
+obj-$(CONFIG_KEEMBAY_SCMI_MBOX)	+= keembay-scmi-mailbox.o
+
 obj-$(CONFIG_ARMADA_37XX_RWTM_MBOX)	+= armada-37xx-rwtm-mailbox.o
 
 obj-$(CONFIG_PLATFORM_MHU)	+= platform_mhu.o
