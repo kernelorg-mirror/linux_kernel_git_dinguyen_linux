@@ -59,9 +59,14 @@ static int a10_reset_init(struct device_node *np)
 	data->rcdev.of_node = np;
 	data->status_active_low = true;
 
-	return reset_controller_register(&data->rcdev);
+	ret = reset_controller_register(&data->rcdev);
+	if (ret)
+		pr_err("unable to register device\n");
+
+	return 0;
 
 err_alloc:
+	release_mem_region(res.start, size);
 	kfree(data);
 	return ret;
 };
