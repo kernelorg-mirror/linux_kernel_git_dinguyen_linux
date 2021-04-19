@@ -136,6 +136,30 @@
 			};
 		};
 
+		fpga_bridge0: fpga_bridge@f9000000 {
+			compatible = "altr,socfpga-lwhps2fpga-bridge";
+			reg = <0xf9000000 0x200000>;
+			resets = <&rst LWHPS2FPGA_RESET>;
+			clocks = <&clkmgr AGILEX_L4_MAIN_CLK>;
+			status = "disabled";
+		};
+
+		fpga_bridge1: fpga_bridge@80000000 {
+			compatible = "altr,socfpga-hps2fpga-bridge";
+			reg = <0x80000000 0x40000000>;
+			resets = <&rst SOC2FPGA_RESET>;
+			clocks = <&clkmgr AGILEX_L4_MAIN_CLK>;
+			status = "disabled";
+		};
+
+		fpga_bridge2: fpga-bridge@c0000000 {
+			compatible = "altr,socfpga-hps2fpga-bridge";
+			reg = <0xc0000000 0x20000000>;
+			resets = <&rst FPGA2SOC_RESET>;
+			clocks = <&clkmgr AGILEX_L4_MAIN_CLK>;
+			status = "disabled";
+		};
+
 		gmac0: ethernet@ff800000 {
 			compatible = "altr,socfpga-stmmac-a10-s10", "snps,dwmac-3.74a", "snps,dwmac";
 			reg = <0xff800000 0x2000>;
