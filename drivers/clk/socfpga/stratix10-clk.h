@@ -52,6 +52,7 @@ struct stratix10_perip_cnt_clock {
 	u8			fixed_divider;
 	unsigned long		bypass_reg;
 	unsigned long		bypass_shift;
+	const struct clk_parent_data	*bypass_mux;
 };
 
 struct stratix10_gate_clock {

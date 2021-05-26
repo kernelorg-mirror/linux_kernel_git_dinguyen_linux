@@ -186,6 +186,20 @@ static const struct clk_parent_data noc_mux[] = {
 	  .name = "boot_clk", },
 };
 
+static const struct clk_parent_data bypass_mux0[] = {
+	{ .fw_name = "main_pll_c3",
+	  .name = "main_pll_c3", },
+	{ .fw_name = "peri_pll_c3",
+	  .name = "peri_pll_c3", },
+};
+
+static const struct clk_parent_data bypass_mux1[] = {
+	{ .fw_name = "peri_pll_c3",
+	  .name = "peri_pll_c3", },
+	{ .fw_name = "main_pll_c3",
+	  .name = "main_pll_c3", },
+};
+
 /* clocks in AO (always on) controller */
 static const struct stratix10_pll_clock agilex_pll_clks[] = {
 	{ AGILEX_BOOT_CLK, "boot_clk", boot_mux, ARRAY_SIZE(boot_mux), 0,
@@ -220,29 +234,29 @@ static const struct stratix10_perip_c_clock agilex_main_perip_c_clks[] = {
 
 static const struct stratix10_perip_cnt_clock agilex_main_perip_cnt_clks[] = {
 	{ AGILEX_MPU_FREE_CLK, "mpu_free_clk", NULL, mpu_free_mux, ARRAY_SIZE(mpu_free_mux),
-	   0, 0x3C, 0, 0, 0},
+	   0, 0x3C, 0, 0, 0, 0},
 	{ AGILEX_NOC_FREE_CLK, "noc_free_clk", NULL, noc_free_mux, ARRAY_SIZE(noc_free_mux),
-	  0, 0x40, 0, 0, 1},
+	  0, 0x40, 0, 0, 1, 0},
 	{ AGILEX_L4_SYS_FREE_CLK, "l4_sys_free_clk", "noc_free_clk", NULL, 1, 0,
-	  0, 4, 0, 0},
+	  0, 4, 0, 0, 0},
 	{ AGILEX_NOC_CLK, "noc_clk", NULL, noc_mux, ARRAY_SIZE(noc_mux),
-	  0, 0, 0, 0x30, 1},
+	  0, 0, 0, 0x30, 1, 0},
 	{ AGILEX_EMAC_A_FREE_CLK, "emaca_free_clk", NULL, emaca_free_mux, ARRAY_SIZE(emaca_free_mux),
-	  0, 0xD4, 0, 0x88, 0},
+	  0, 0xD4, 0, 0x88, 0, bypass_mux1},
 	{ AGILEX_EMAC_B_FREE_CLK, "emacb_free_clk", NULL, emacb_free_mux, ARRAY_SIZE(emacb_free_mux),
-	  0, 0xD8, 0, 0x88, 1},
+	  0, 0xD8, 0, 0x88, 1, bypass_mux1},
 	{ AGILEX_EMAC_PTP_FREE_CLK, "emac_ptp_free_clk", NULL, emac_ptp_free_mux,
-	  ARRAY_SIZE(emac_ptp_free_mux), 0, 0xDC, 0, 0x88, 2},
+	  ARRAY_SIZE(emac_ptp_free_mux), 0, 0xDC, 0, 0x88, 2, bypass_mux0},
 	{ AGILEX_GPIO_DB_FREE_CLK, "gpio_db_free_clk", NULL, gpio_db_free_mux,
-	  ARRAY_SIZE(gpio_db_free_mux), 0, 0xE0, 0, 0x88, 3},
+	  ARRAY_SIZE(gpio_db_free_mux), 0, 0xE0, 0, 0x88, 3, bypass_mux0},
 	{ AGILEX_SDMMC_FREE_CLK, "sdmmc_free_clk", NULL, sdmmc_free_mux,
-	  ARRAY_SIZE(sdmmc_free_mux), 0, 0xE4, 0, 0x88, 4},
+	  ARRAY_SIZE(sdmmc_free_mux), 0, 0xE4, 0, 0x88, 4, bypass_mux0},
 	{ AGILEX_S2F_USER0_FREE_CLK, "s2f_user0_free_clk", NULL, s2f_usr0_free_mux,
-	  ARRAY_SIZE(s2f_usr0_free_mux), 0, 0xE8, 0, 0, 0},
+	  ARRAY_SIZE(s2f_usr0_free_mux), 0, 0xE8, 0, 0, 0, bypass_mux0},
 	{ AGILEX_S2F_USER1_FREE_CLK, "s2f_user1_free_clk", NULL, s2f_usr1_free_mux,
-	  ARRAY_SIZE(s2f_usr1_free_mux), 0, 0xEC, 0, 0x88, 5},
+	  ARRAY_SIZE(s2f_usr1_free_mux), 0, 0xEC, 0, 0x88, 5, bypass_mux0},
 	{ AGILEX_PSI_REF_FREE_CLK, "psi_ref_free_clk", NULL, psi_ref_free_mux,
-	  ARRAY_SIZE(psi_ref_free_mux), 0, 0xF0, 0, 0x88, 6},
+	  ARRAY_SIZE(psi_ref_free_mux), 0, 0xF0, 0, 0x88, 6, bypass_mux0},
 };
 
 static const struct stratix10_gate_clock agilex_gate_clks[] = {
