@@ -121,7 +121,7 @@ asmlinkage void breakpoint_c(struct pt_regs *fp)
 /* Alignment exception handler */
 asmlinkage void handle_unaligned_c(struct pt_regs *fp, int cause)
 {
-	unsigned long addr = RDCTL(CTL_BADADDR);
+	unsigned long addr = NIOS2_RDCTL(NIOS2_CTL_BADADDR);
 
 	cause >>= 2;
 	fp->ea -= 4;
@@ -167,7 +167,7 @@ asmlinkage void handle_diverror_c(struct pt_regs *fp)
 /* Unhandled exception handler */
 asmlinkage void unhandled_exception(struct pt_regs *regs, int cause)
 {
-	unsigned long addr = RDCTL(CTL_BADADDR);
+	unsigned long addr = NIOS2_RDCTL(NIOS2_CTL_BADADDR);
 
 	cause /= 4;
 

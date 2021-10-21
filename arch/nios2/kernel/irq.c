@@ -30,13 +30,13 @@ asmlinkage void do_IRQ(int hwirq, struct pt_regs *regs)
 static void chip_unmask(struct irq_data *d)
 {
 	ienable |= (1 << d->hwirq);
-	WRCTL(CTL_IENABLE, ienable);
+	NIOS2_WRCTL(NIOS2_CTL_IENABLE, ienable);
 }
 
 static void chip_mask(struct irq_data *d)
 {
 	ienable &= ~(1 << d->hwirq);
-	WRCTL(CTL_IENABLE, ienable);
+	NIOS2_WRCTL(NIOS2_CTL_IENABLE, ienable);
 }
 
 static struct irq_chip m_irq_chip = {
@@ -75,5 +75,5 @@ void __init init_IRQ(void)
 	irq_set_default_host(domain);
 	of_node_put(node);
 	/* Load the initial ienable value */
-	ienable = RDCTL(CTL_IENABLE);
+	ienable = NIOS2_RDCTL(NIOS2_CTL_IENABLE);
 }

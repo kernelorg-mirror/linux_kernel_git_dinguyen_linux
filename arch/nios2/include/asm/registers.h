@@ -11,26 +11,26 @@
 #endif
 
 /* control register numbers */
-#define CTL_FSTATUS	0
-#define CTL_ESTATUS	1
-#define CTL_BSTATUS	2
-#define CTL_IENABLE	3
-#define CTL_IPENDING	4
-#define CTL_CPUID	5
-#define CTL_RSV1	6
-#define CTL_EXCEPTION	7
-#define CTL_PTEADDR	8
-#define CTL_TLBACC	9
-#define CTL_TLBMISC	10
-#define CTL_RSV2	11
-#define CTL_BADADDR	12
-#define CTL_CONFIG	13
-#define CTL_MPUBASE	14
-#define CTL_MPUACC	15
+#define NIOS2_CTL_FSTATUS	0
+#define NIOS2_CTL_ESTATUS	1
+#define NIOS2_CTL_BSTATUS	2
+#define NIOS2_CTL_IENABLE	3
+#define NIOS2_CTL_IPENDING	4
+#define NIOS2_CTL_CPUID	5
+#define NIOS2_CTL_RSV1	6
+#define NIOS2_CTL_EXCEPTION	7
+#define NIOS2_CTL_PTEADDR	8
+#define NIOS2_CTL_TLBACC	9
+#define NIOS2_CTL_TLBMISC	10
+#define NIOS2_CTL_RSV2	11
+#define NIOS2_CTL_BADADDR	12
+#define NIOS2_CTL_CONFIG	13
+#define NIOS2_CTL_MPUBASE	14
+#define NIOS2_CTL_MPUACC	15
 
 /* access control registers using GCC builtins */
-#define RDCTL(r)	__builtin_rdctl(r)
-#define WRCTL(r, v)	__builtin_wrctl(r, v)
+#define NIOS2_RDCTL(r)	__builtin_rdctl(r)
+#define NIOS2_WRCTL(r, v)	__builtin_wrctl(r, v)
 
 /* status register bits */
 #define STATUS_PIE	(1 << 0)	/* processor interrupt enable */

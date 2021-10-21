@@ -147,7 +147,7 @@ asmlinkage void handle_unaligned_c(struct pt_regs *fp, int cause)
 		}
 	}
 
-	addr = RDCTL(CTL_BADADDR);
+	addr = NIOS2_RDCTL(NIOS2_CTL_BADADDR);
 	cause >>= 2;
 
 	if (fault) {
