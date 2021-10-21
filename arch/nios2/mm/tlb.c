@@ -24,7 +24,7 @@
 
 static void get_misc_and_pid(unsigned long *misc, unsigned long *pid)
 {
-	*misc  = RDCTL(CTL_TLBMISC);
+	*misc  = NIOS2_RDCTL(NIOS2_CTL_TLBMISC);
 	*misc &= (TLBMISC_PID | TLBMISC_WAY);
 	*pid  = *misc & TLBMISC_PID;
 }
@@ -50,7 +50,7 @@ static void replace_tlb_one_pid(unsigned long addr, unsigned long mmu_pid, unsig
 	/* remember pid/way until we return. */
 	get_misc_and_pid(&org_misc, &pid_misc);
 
-	WRCTL(CTL_PTEADDR, (addr >> PAGE_SHIFT) << 2);
+	NIOS2_WRCTL(NIOS2_CTL_PTEADDR, (addr >> PAGE_SHIFT) << 2);
 
 	for (way = 0; way < cpuinfo.tlb_num_ways; way++) {
 		unsigned long pteaddr;
@@ -58,23 +58,23 @@ static void replace_tlb_one_pid(unsigned long addr, unsigned long mmu_pid, unsig
 		unsigned long pid;
 
 		tlbmisc = TLBMISC_RD | (way << TLBMISC_WAY_SHIFT);
-		WRCTL(CTL_TLBMISC, tlbmisc);
+		NIOS2_WRCTL(NIOS2_CTL_TLBMISC, tlbmisc);
 
-		pteaddr = RDCTL(CTL_PTEADDR);
+		pteaddr = NIOS2_RDCTL(NIOS2_CTL_PTEADDR);
 		if (((pteaddr >> 2) & 0xfffff) != (addr >> PAGE_SHIFT))
 			continue;
 
-		tlbmisc = RDCTL(CTL_TLBMISC);
+		tlbmisc = NIOS2_RDCTL(NIOS2_CTL_TLBMISC);
 		pid = (tlbmisc >> TLBMISC_PID_SHIFT) & TLBMISC_PID_MASK;
 		if (pid != mmu_pid)
 			continue;
 
 		tlbmisc = (mmu_pid << TLBMISC_PID_SHIFT) | TLBMISC_WE |
 			  (way << TLBMISC_WAY_SHIFT);
-		WRCTL(CTL_TLBMISC, tlbmisc);
+		NIOS2_WRCTL(NIOS2_CTL_TLBMISC, tlbmisc);
 		if (tlbacc == 0)
-			WRCTL(CTL_PTEADDR, pteaddr_invalid(addr));
-		WRCTL(CTL_TLBACC, tlbacc);
+			NIOS2_WRCTL(NIOS2_CTL_PTEADDR, pteaddr_invalid(addr));
+		NIOS2_WRCTL(NIOS2_CTL_TLBACC, tlbacc);
 		/*
 		 * There should be only a single entry that maps a
 		 * particular {address,pid} so break after a match.
@@ -82,7 +82,7 @@ static void replace_tlb_one_pid(unsigned long addr, unsigned long mmu_pid, unsig
 		break;
 	}
 
-	WRCTL(CTL_TLBMISC, org_misc);
+	NIOS2_WRCTL(NIOS2_CTL_TLBMISC, org_misc);
 }
 
 static void flush_tlb_one_pid(unsigned long addr, unsigned long mmu_pid)
@@ -131,16 +131,16 @@ static void flush_tlb_one(unsigned long addr)
 	/* remember pid/way until we return. */
 	get_misc_and_pid(&org_misc, &pid_misc);
 
-	WRCTL(CTL_PTEADDR, (addr >> PAGE_SHIFT) << 2);
+	NIOS2_WRCTL(NIOS2_CTL_PTEADDR, (addr >> PAGE_SHIFT) << 2);
 
 	for (way = 0; way < cpuinfo.tlb_num_ways; way++) {
 		unsigned long pteaddr;
 		unsigned long tlbmisc;
 
 		tlbmisc = TLBMISC_RD | (way << TLBMISC_WAY_SHIFT);
-		WRCTL(CTL_TLBMISC, tlbmisc);
+		NIOS2_WRCTL(NIOS2_CTL_TLBMISC, tlbmisc);
 
-		pteaddr = RDCTL(CTL_PTEADDR);
+		pteaddr = NIOS2_RDCTL(NIOS2_CTL_PTEADDR);
 		if (((pteaddr >> 2) & 0xfffff) != (addr >> PAGE_SHIFT))
 			continue;
 
@@ -148,12 +148,12 @@ static void flush_tlb_one(unsigned long addr)
 			 way, (pid_misc >> TLBMISC_PID_SHIFT));
 
 		tlbmisc = TLBMISC_WE | (way << TLBMISC_WAY_SHIFT);
-		WRCTL(CTL_TLBMISC, tlbmisc);
-		WRCTL(CTL_PTEADDR, pteaddr_invalid(addr));
-		WRCTL(CTL_TLBACC, 0);
+		NIOS2_WRCTL(NIOS2_CTL_TLBMISC, tlbmisc);
+		NIOS2_WRCTL(NIOS2_CTL_PTEADDR, pteaddr_invalid(addr));
+		NIOS2_WRCTL(NIOS2_CTL_TLBACC, 0);
 	}
 
-	WRCTL(CTL_TLBMISC, org_misc);
+	NIOS2_WRCTL(NIOS2_CTL_TLBMISC, org_misc);
 }
 
 void flush_tlb_kernel_range(unsigned long start, unsigned long end)
@@ -173,19 +173,19 @@ void dump_tlb_line(unsigned long line)
 		line << (PAGE_SHIFT + cpuinfo.tlb_num_ways_log2));
 
 	/* remember pid/way until we return */
-	org_misc = (RDCTL(CTL_TLBMISC) & (TLBMISC_PID | TLBMISC_WAY));
+	org_misc = (NIOS2_RDCTL(NIOS2_CTL_TLBMISC) & (TLBMISC_PID | TLBMISC_WAY));
 
-	WRCTL(CTL_PTEADDR, line << 2);
+	NIOS2_WRCTL(NIOS2_CTL_PTEADDR, line << 2);
 
 	for (way = 0; way < cpuinfo.tlb_num_ways; way++) {
 		unsigned long pteaddr;
 		unsigned long tlbmisc;
 		unsigned long tlbacc;
 
-		WRCTL(CTL_TLBMISC, TLBMISC_RD | (way << TLBMISC_WAY_SHIFT));
-		pteaddr = RDCTL(CTL_PTEADDR);
-		tlbmisc = RDCTL(CTL_TLBMISC);
-		tlbacc = RDCTL(CTL_TLBACC);
+		NIOS2_WRCTL(NIOS2_CTL_TLBMISC, TLBMISC_RD | (way << TLBMISC_WAY_SHIFT));
+		pteaddr = NIOS2_RDCTL(NIOS2_CTL_PTEADDR);
+		tlbmisc = NIOS2_RDCTL(NIOS2_CTL_TLBMISC);
+		tlbacc = NIOS2_RDCTL(NIOS2_CTL_TLBACC);
 
 		if ((tlbacc << PAGE_SHIFT) != 0) {
 			pr_debug("-- way:%02x vpn:0x%08lx phys:0x%08lx pid:0x%02lx flags:%c%c%c%c%c\n",
@@ -202,7 +202,7 @@ void dump_tlb_line(unsigned long line)
 		}
 	}
 
-	WRCTL(CTL_TLBMISC, org_misc);
+	NIOS2_WRCTL(NIOS2_CTL_TLBMISC, org_misc);
 }
 
 void dump_tlb(void)
@@ -224,28 +224,28 @@ void flush_tlb_pid(unsigned long mmu_pid)
 	get_misc_and_pid(&org_misc, &pid_misc);
 
 	for (line = 0; line < cpuinfo.tlb_num_lines; line++) {
-		WRCTL(CTL_PTEADDR, pteaddr_invalid(addr));
+		NIOS2_WRCTL(NIOS2_CTL_PTEADDR, pteaddr_invalid(addr));
 
 		for (way = 0; way < cpuinfo.tlb_num_ways; way++) {
 			unsigned long tlbmisc;
 			unsigned long pid;
 
 			tlbmisc = TLBMISC_RD | (way << TLBMISC_WAY_SHIFT);
-			WRCTL(CTL_TLBMISC, tlbmisc);
-			tlbmisc = RDCTL(CTL_TLBMISC);
+			NIOS2_WRCTL(NIOS2_CTL_TLBMISC, tlbmisc);
+			tlbmisc = NIOS2_RDCTL(NIOS2_CTL_TLBMISC);
 			pid = (tlbmisc >> TLBMISC_PID_SHIFT) & TLBMISC_PID_MASK;
 			if (pid != mmu_pid)
 				continue;
 
 			tlbmisc = TLBMISC_WE | (way << TLBMISC_WAY_SHIFT);
-			WRCTL(CTL_TLBMISC, tlbmisc);
-			WRCTL(CTL_TLBACC, 0);
+			NIOS2_WRCTL(NIOS2_CTL_TLBMISC, tlbmisc);
+			NIOS2_WRCTL(NIOS2_CTL_TLBACC, 0);
 		}
 
 		addr += PAGE_SIZE;
 	}
 
-	WRCTL(CTL_TLBMISC, org_misc);
+	NIOS2_WRCTL(NIOS2_CTL_TLBMISC, org_misc);
 }
 
 /*
@@ -273,28 +273,28 @@ void flush_tlb_all(void)
 	get_misc_and_pid(&org_misc, &pid_misc);
 
 	/* Start at way 0, way is auto-incremented after each TLBACC write */
-	WRCTL(CTL_TLBMISC, TLBMISC_WE);
+	NIOS2_WRCTL(NIOS2_CTL_TLBMISC, TLBMISC_WE);
 
 	/* Map each TLB entry to physcal address 0 with no-access and a
 	   bad ptbase */
 	for (line = 0; line < cpuinfo.tlb_num_lines; line++) {
-		WRCTL(CTL_PTEADDR, pteaddr_invalid(addr));
+		NIOS2_WRCTL(NIOS2_CTL_PTEADDR, pteaddr_invalid(addr));
 		for (way = 0; way < cpuinfo.tlb_num_ways; way++)
-			WRCTL(CTL_TLBACC, 0);
+			NIOS2_WRCTL(NIOS2_CTL_TLBACC, 0);
 
 		addr += PAGE_SIZE;
 	}
 
 	/* restore pid/way */
-	WRCTL(CTL_TLBMISC, org_misc);
+	NIOS2_WRCTL(NIOS2_CTL_TLBMISC, org_misc);
 }
 
 void set_mmu_pid(unsigned long pid)
 {
 	unsigned long tlbmisc;
 
-	tlbmisc = RDCTL(CTL_TLBMISC);
+	tlbmisc = NIOS2_RDCTL(NIOS2_CTL_TLBMISC);
 	tlbmisc = (tlbmisc & TLBMISC_WAY);
 	tlbmisc |= (pid & TLBMISC_PID_MASK) << TLBMISC_PID_SHIFT;
-	WRCTL(CTL_TLBMISC, tlbmisc);
+	NIOS2_WRCTL(NIOS2_CTL_TLBMISC, tlbmisc);
 }
