@@ -16,16 +16,8 @@
 #define TASK_SIZE_MAX			TASK_SIZE
 #endif
 
-#ifndef uaccess_kernel
-#ifdef CONFIG_SET_FS
-#define uaccess_kernel()		(get_fs().seg == KERNEL_DS.seg)
-#else
-#define uaccess_kernel()		(0)
-#endif
-#endif
-
 #ifndef user_addr_max
-#define user_addr_max()			(uaccess_kernel() ? ~0UL : TASK_SIZE_MAX)
+#define user_addr_max()			TASK_SIZE_MAX
 #endif
 
 #ifndef __access_ok
