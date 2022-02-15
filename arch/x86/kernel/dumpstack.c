@@ -85,7 +85,7 @@ static int copy_code(struct pt_regs *regs, u8 *buf, unsigned long src,
 	 * Make sure userspace isn't trying to trick us into dumping kernel
 	 * memory by pointing the userspace instruction pointer at it.
 	 */
-	if (__chk_range_not_ok(src, nbytes, TASK_SIZE_MAX))
+	if (!__access_ok((void __user *)src, nbytes))
 		return -EINVAL;
 
 	/*
