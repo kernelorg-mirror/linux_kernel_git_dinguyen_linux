@@ -10,24 +10,7 @@
 #include <linux/compiler.h>
 #include <linux/types.h>
 #include <asm/extable.h>
-
-/* We let the MMU do all checking */
-static inline int access_ok(const void __user *ptr,
-			    unsigned long size)
-{
-	unsigned long limit = TASK_SIZE;
-	unsigned long addr = (unsigned long)ptr;
-
-	/*
-	 * XXX: for !CONFIG_CPU_HAS_ADDRESS_SPACES this really needs to check
-	 * for TASK_SIZE!
-	 * Removing this helper is probably sufficient.
-	 */
-	if (IS_ENABLED(CONFIG_CPU_HAS_ADDRESS_SPACES))
-		return 1;
-
-	return (size <= limit) && (addr <= (limit - size));
-}
+#include <asm-generic/access_ok.h>
 
 /*
  * Not all varients of the 68k family support the notion of address spaces.
