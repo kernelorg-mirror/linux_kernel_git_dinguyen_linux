@@ -209,7 +209,6 @@ unsigned long raw_copy_to_user(void *to, const void *from, unsigned long n);
 unsigned long __clear_user(void __user *to, unsigned long n);
 #define __clear_user __clear_user
 
-#include <asm/segment.h>
 #include <asm-generic/uaccess.h>
 
 #endif /* __ASM_CSKY_UACCESS_H */
