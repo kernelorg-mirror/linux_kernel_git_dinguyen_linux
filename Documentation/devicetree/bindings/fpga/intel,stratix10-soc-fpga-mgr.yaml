@@ -20,9 +20,13 @@ description:
 
 properties:
   compatible:
-    enum:
-      - intel,stratix10-soc-fpga-mgr
-      - intel,agilex-soc-fpga-mgr
+    oneOf:
+      - enum:
+          - intel,stratix10-soc-fpga-mgr
+          - intel,agilex-soc-fpga-mgr
+      - items:
+          - const: intel,agilex5-soc-fpga-mgr
+          - const: intel,agilex-soc-fpga-mgr
 
 required:
   - compatible
