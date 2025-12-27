@@ -64,7 +64,6 @@ struct socfpga_dwmac {
 	struct plat_stmmacenet_data *plat_dat;
 	struct regmap *sys_mgr_base_addr;
 	struct reset_control *stmmac_rst;
-	struct reset_control *stmmac_ocp_rst;
 	void __iomem *splitter_base;
 	void __iomem *tse_pcs_base;
 	void __iomem *sgmii_adapter_base;
@@ -406,7 +405,7 @@ static int socfpga_gen5_set_phy_mode(struct socfpga_dwmac *dwmac)
 		val = SYSMGR_EMACGRP_CTRL_PHYSEL_ENUM_GMII_MII;
 
 	/* Assert reset to the enet controller before changing the phy mode */
-	reset_control_assert(dwmac->stmmac_ocp_rst);
+	reset_control_assert(dwmac->plat_dat->stmmac_ahb_rst);
 	reset_control_assert(dwmac->stmmac_rst);
 
 	regmap_read(sys_mgr_base_addr, reg_offset, &ctrl);
@@ -435,7 +434,7 @@ static int socfpga_gen5_set_phy_mode(struct socfpga_dwmac *dwmac)
 	/* Deassert reset for the phy configuration to be sampled by
 	 * the enet controller, and operation to start in requested mode
 	 */
-	reset_control_deassert(dwmac->stmmac_ocp_rst);
+	reset_control_deassert(dwmac->plat_dat->stmmac_ahb_rst);
 	reset_control_deassert(dwmac->stmmac_rst);
 	if (phymode == PHY_INTERFACE_MODE_SGMII)
 		socfpga_sgmii_config(dwmac, true);
@@ -462,7 +461,7 @@ static int socfpga_gen10_set_phy_mode(struct socfpga_dwmac *dwmac)
 		val = SYSMGR_EMACGRP_CTRL_PHYSEL_ENUM_GMII_MII;
 
 	/* Assert reset to the enet controller before changing the phy mode */
-	reset_control_assert(dwmac->stmmac_ocp_rst);
+	reset_control_assert(dwmac->plat_dat->stmmac_ahb_rst);
 	reset_control_assert(dwmac->stmmac_rst);
 
 	regmap_read(sys_mgr_base_addr, reg_offset, &ctrl);
@@ -488,7 +487,7 @@ static int socfpga_gen10_set_phy_mode(struct socfpga_dwmac *dwmac)
 	/* Deassert reset for the phy configuration to be sampled by
 	 * the enet controller, and operation to start in requested mode
 	 */
-	reset_control_deassert(dwmac->stmmac_ocp_rst);
+	reset_control_deassert(dwmac->plat_dat->stmmac_ahb_rst);
 	reset_control_deassert(dwmac->stmmac_rst);
 	if (phymode == PHY_INTERFACE_MODE_SGMII)
 		socfpga_sgmii_config(dwmac, true);
@@ -602,6 +601,7 @@ static int socfpga_dwmac_probe(struct platform_device *pdev)
 	struct device		*dev = &pdev->dev;
 	int			ret;
 	struct socfpga_dwmac	*dwmac;
+	struct reset_control	*ocp_rst;
 	const struct socfpga_dwmac_ops *ops;
 
 	ops = device_get_match_data(&pdev->dev);
@@ -622,14 +622,17 @@ static int socfpga_dwmac_probe(struct platform_device *pdev)
 	if (!dwmac)
 		return -ENOMEM;
 
-	dwmac->stmmac_ocp_rst = devm_reset_control_get_optional(dev, "stmmaceth-ocp");
-	if (IS_ERR(dwmac->stmmac_ocp_rst)) {
-		ret = PTR_ERR(dwmac->stmmac_ocp_rst);
-		dev_err(dev, "error getting reset control of ocp %d\n", ret);
-		return ret;
+	if (!plat_dat->stmmac_ahb_rst) {
+		ocp_rst = devm_reset_control_get_optional(dev, "stmmaceth-ocp");
+		if (IS_ERR(ocp_rst))
+			return dev_err_probe(dev, PTR_ERR(ocp_rst),
+					     "failed to get ocp reset");
+		if (ocp_rst)
+			dev_warn(&pdev->dev, "ocp reset is deprecated, please update your device tree.\n");
+		plat_dat->stmmac_ahb_rst = ocp_rst;
 	}
 
-	reset_control_deassert(dwmac->stmmac_ocp_rst);
+	reset_control_deassert(plat_dat->stmmac_ahb_rst);
 
 	ret = socfpga_dwmac_parse_data(dwmac, dev);
 	if (ret) {
