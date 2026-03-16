@@ -13,3 +13,13 @@ config ALTERA_TSE
 
 	  To compile this driver as a module, choose M here. The module
 	  will be called alteratse.
+
+config ALTERA_HSSISS
+	tristate "Altera FPGA HSSI Subsystem support"
+	depends on HAS_IOMEM
+	depends on OF
+	help
+	  This driver supports the Altera FPGA HSSI subsystem.
+
+	  To compile this driver as a module, choose M here. The module
+	  will be called altera-hssiss.
