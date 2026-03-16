@@ -1,0 +1,53 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/net/altera,hssiss.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Altera HSSI subsystem for ethernet
+
+maintainers:
+  - Subhransu S. Prusty <subhransu.sekhar.prusty@altera.com>
+  - Narayan, Preetam <preetam.narayan@altera.com>
+
+description: |
+  Altera HSSI SS(subsystem) IP provides connectivity to core ethernet IPs (soft IP
+  and hard IP). HSSI subsystem runs a firmware enabling netdev users standardized
+  access to core ethernet subsystem. HSSI SS manages the configuration of
+  ethernet IPs, while facilitating the data transfer between DMA and core
+  through AXI interface.
+
+properties:
+  compatible:
+    const: altr,hssiss-1.0
+
+  reg:
+    description: Address and length of configuration space
+    minItems: 1
+    maxItems: 1
+
+  reg-names:
+    items:
+      - const: sscsr
+
+  reset-mode:
+    description: Interface medium to reset the HSSI SS and ethernet core
+    items:
+      enum: [ "reg", "gpio" ]
+
+required:
+  - compatible
+  - reg
+  - reg-names
+  - reset-mode
+
+additionalProperties: false
+
+examples:
+  - |
+    hssiss_0_hssiss: hssiss_0_hssiss {
+      compatible = "altr,hssiss-1.0";
+      reg-names = "sscsr";
+      reg = <0x80000000 0x04000000>;
+      reset-mode ="reg";
+    };
