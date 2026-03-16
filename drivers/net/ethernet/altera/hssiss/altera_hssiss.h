@@ -330,6 +330,7 @@ struct altera_hssiss {
 	/* To synchronize coldrst triggered from multiple ports */
 	struct mutex coldrst_mutex;
 	struct cold_reset_register cold_rst_reg;
+	struct altera_hssiss_dbg *dbgfs;
 };
 
 /* driver APIs to be called by hssiss debugfs */
@@ -345,5 +346,20 @@ int altera_hssiss_set_mtu(struct altera_eth_intf *intf,
 int altera_hssiss_ncsi_link_status(struct altera_eth_intf *intf, void *priv_data);
 int altera_hssiss_get_fw_version(struct altera_eth_intf *intf, void *priv_data);
 int altera_hssiss_enable_disable_loopback(struct altera_eth_intf *intf, bool en);
+
+#ifdef CONFIG_DEBUG_FS
+struct altera_hssiss_dbg *altera_hssiss_dbgfs_init(struct platform_device *pdev,
+						   struct altera_hssiss *data);
+void altera_hssiss_dbgfs_remove(struct altera_hssiss_dbg *d);
+#else
+static inline struct altera_hssiss_dbg
+*altera_hssiss_dbgfs_init(struct platform_device *pdev,
+			  struct altera_hssiss *data)
+{
+	return NULL;
+}
+
+static inline void altera_hssiss_dbgfs_remove(struct altera_hssiss_dbg *d) {}
+#endif /* CONFIG_DEBUG_FS */
 
 #endif /* __ALTERA_HSSISS_H__ */

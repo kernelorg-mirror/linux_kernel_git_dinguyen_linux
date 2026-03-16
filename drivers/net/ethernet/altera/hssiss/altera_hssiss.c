@@ -786,6 +786,10 @@ static int altera_hssiss_probe(struct platform_device *pdev)
 	priv->ops.get_profile_lane_speed = hssiss_get_profile_lane_speed;
 	priv->ops.get_pma_lane_count = hssiss_get_pma_lane_count;
 
+	priv->dbgfs = altera_hssiss_dbgfs_init(pdev, priv);
+	if (!priv->dbgfs)
+		dev_warn(priv->dev, "Error creating dbgfs");
+
 	platform_set_drvdata(pdev, priv);
 
 	return ret;
@@ -804,6 +808,7 @@ static void altera_hssiss_remove(struct platform_device *pdev)
 
 	mutex_destroy(&priv->sal_mutex);
 	mutex_destroy(&priv->coldrst_mutex);
+	altera_hssiss_dbgfs_remove(priv->dbgfs);
 	platform_set_drvdata(pdev, NULL);
 }
 
