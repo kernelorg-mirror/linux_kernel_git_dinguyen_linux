@@ -2107,11 +2107,49 @@ static int s10_edac_dberr_handler(struct notifier_block *this,
 	return NOTIFY_DONE;
 }
 
+/*
+ * Ordered table of named interrupts published by an
+ * "altr,socfpga-agilex5-ecc-manager" device tree node. Indices match
+ * enum altr_agilex5_irq_idx. Every name is required.
+ */
+static const char * const altr_agilex5_irq_names[ALTR_AGILEX5_NUM_IRQS] = {
+	[ALTR_AGILEX5_IRQ_GLOBAL_SBE]   = "global_sbe",
+	[ALTR_AGILEX5_IRQ_GLOBAL_DBE]   = "global_dbe",
+	[ALTR_AGILEX5_IRQ_IO96B0]       = "io96b0",
+	[ALTR_AGILEX5_IRQ_IO96B1]       = "io96b1",
+	[ALTR_AGILEX5_IRQ_SDM_QSPI_SBE] = "sdm_qspi_sbe",
+	[ALTR_AGILEX5_IRQ_SDM_QSPI_DBE] = "sdm_qspi_dbe",
+	[ALTR_AGILEX5_IRQ_SDM_SEU]      = "sdm_seu",
+};
+
+/*
+ * Populate edac->agilex5_irqs[] from the named interrupts on the manager
+ * platform device. Every name is required. platform_get_irq_byname()
+ * reports a missing interrupt and returns -EPROBE_DEFER when the parent
+ * irqchip is not yet probed so probe can be retried.
+ */
+static int altr_agilex5_get_named_irqs(struct platform_device *pdev,
+				       struct altr_arria10_edac *edac)
+{
+	int i, irq;
+
+	for (i = 0; i < ALTR_AGILEX5_NUM_IRQS; i++) {
+		irq = platform_get_irq_byname(pdev, altr_agilex5_irq_names[i]);
+		if (irq < 0)
+			return irq;
+
+		edac->agilex5_irqs[i] = irq;
+	}
+
+	return 0;
+}
+
 /****************** Arria 10 EDAC Probe Function *********************/
 static int altr_edac_a10_probe(struct platform_device *pdev)
 {
 	struct altr_arria10_edac *edac;
 	struct device_node *child;
+	int rc;
 
 	edac = devm_kzalloc(&pdev->dev, sizeof(*edac), GFP_KERNEL);
 	if (!edac)
@@ -2147,14 +2185,32 @@ static int altr_edac_a10_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
-	edac->sb_irq = platform_get_irq(pdev, 0);
-	if (edac->sb_irq < 0)
-		return edac->sb_irq;
+	if (edac->flag == SOCFPGA_AGILEX5) {
+		rc = altr_agilex5_get_named_irqs(pdev, edac);
+		if (rc) {
+			irq_domain_remove(edac->domain);
+			return rc;
+		}
+
+		edac->sb_irq = edac->agilex5_irqs[ALTR_AGILEX5_IRQ_GLOBAL_SBE];
+	} else {
+		edac->sb_irq = platform_get_irq(pdev, 0);
+		if (edac->sb_irq < 0)
+			return edac->sb_irq;
+	}
 
 	irq_set_chained_handler_and_data(edac->sb_irq,
 					 altr_edac_a10_irq_handler,
 					 edac);
 
+	/*
+	 * Unlike Stratix10/Agilex7 (which deliver uncorrectable errors as
+	 * Asynchronous SError), Agilex5 routes the global double-bit error
+	 * through a dedicated SPI ("global_dbe"). Hook it into the same
+	 * chained handler so the existing sb_irq/db_irq demux in
+	 * altr_edac_a10_irq_handler() routes DBE events through the manager's
+	 * IRQ domain.
+	 */
 	if (edac->flag == SOCFPGA_S10) {
 		int dberror, err_addr;
 
@@ -2177,13 +2233,18 @@ static int altr_edac_a10_probe(struct platform_device *pdev)
 			regmap_write(edac->ecc_mgr_map,
 				     S10_SYSMGR_UE_ADDR_OFST, 0);
 		}
-	} else {
+	} else if (edac->flag == SOCFPGA_A10) {
 		edac->db_irq = platform_get_irq(pdev, 1);
 		if (edac->db_irq < 0)
 			return edac->db_irq;
 
 		irq_set_chained_handler_and_data(edac->db_irq,
 						 altr_edac_a10_irq_handler, edac);
+	} else if (edac->flag == SOCFPGA_AGILEX5) {
+		edac->db_irq = edac->agilex5_irqs[ALTR_AGILEX5_IRQ_GLOBAL_DBE];
+		irq_set_chained_handler_and_data(edac->db_irq,
+						 altr_edac_a10_irq_handler,
+						 edac);
 	}
 
 	for_each_child_of_node(pdev->dev.of_node, child) {
@@ -2209,6 +2270,8 @@ static const struct of_device_id altr_edac_a10_of_match[] = {
 	  .data = (void *)SOCFPGA_A10 },
 	{ .compatible = "altr,socfpga-s10-ecc-manager",
 	  .data = (void *)SOCFPGA_S10 },
+	{ .compatible = "altr,socfpga-agilex5-ecc-manager",
+	  .data = (void *)SOCFPGA_AGILEX5 },
 	{},
 };
 MODULE_DEVICE_TABLE(of, altr_edac_a10_of_match);
