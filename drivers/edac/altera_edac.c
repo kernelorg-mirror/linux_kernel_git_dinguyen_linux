@@ -2108,11 +2108,55 @@ static int s10_edac_dberr_handler(struct notifier_block *this,
 }
 #endif
 
+/*
+ * Ordered table of named interrupts published by an
+ * "altr,socfpga-agilex5-ecc-manager" device tree node. Indices match
+ * enum altr_agilex5_irq_idx. Only "global_sbe" is mandatory; the rest are
+ * optional so platforms can omit interrupts for unused subsystems.
+ */
+static const char * const altr_agilex5_irq_names[ALTR_AGILEX5_NUM_IRQS] = {
+	[ALTR_AGILEX5_IRQ_GLOBAL_SBE]   = "global_sbe",
+	[ALTR_AGILEX5_IRQ_GLOBAL_DBE]   = "global_dbe",
+	[ALTR_AGILEX5_IRQ_IO96B0]       = "io96b0",
+	[ALTR_AGILEX5_IRQ_IO96B1]       = "io96b1",
+	[ALTR_AGILEX5_IRQ_SDM_QSPI_SBE] = "sdm_qspi_sbe",
+	[ALTR_AGILEX5_IRQ_SDM_QSPI_DBE] = "sdm_qspi_dbe",
+	[ALTR_AGILEX5_IRQ_SDM_SEU]      = "sdm_seu",
+};
+
+/*
+ * Populate edac->agilex5_irqs[] from the named interrupts on the manager
+ * platform device. Missing optional interrupts are stored as a negative
+ * errno (-ENXIO) so that subsequent feature code can probe whether the
+ * resource exists. global_sbe is required because it drives the manager's
+ * IRQ domain dispatch path.
+ */
+static int altr_agilex5_get_named_irqs(struct platform_device *pdev,
+				       struct altr_arria10_edac *edac)
+{
+	int i, irq;
+
+	for (i = 0; i < ALTR_AGILEX5_NUM_IRQS; i++) {
+		irq = platform_get_irq_byname_optional(pdev,
+						       altr_agilex5_irq_names[i]);
+		edac->agilex5_irqs[i] = irq > 0 ? irq : -ENXIO;
+	}
+
+	if (edac->agilex5_irqs[ALTR_AGILEX5_IRQ_GLOBAL_SBE] < 0) {
+		dev_err(&pdev->dev,
+			"Agilex5 ECC manager missing required 'global_sbe' interrupt\n");
+		return -ENODEV;
+	}
+
+	return 0;
+}
+
 /****************** Arria 10 EDAC Probe Function *********************/
 static int altr_edac_a10_probe(struct platform_device *pdev)
 {
 	struct altr_arria10_edac *edac;
 	struct device_node *child;
+	int rc;
 
 	edac = devm_kzalloc(&pdev->dev, sizeof(*edac), GFP_KERNEL);
 	if (!edac)
@@ -2121,6 +2165,8 @@ static int altr_edac_a10_probe(struct platform_device *pdev)
 	edac->dev = &pdev->dev;
 	platform_set_drvdata(pdev, edac);
 	INIT_LIST_HEAD(&edac->a10_ecc_devices);
+	edac->is_agilex5 = of_device_is_compatible(pdev->dev.of_node,
+						   "altr,socfpga-agilex5-ecc-manager");
 
 	edac->ecc_mgr_map =
 		altr_sysmgr_regmap_lookup_by_phandle(pdev->dev.of_node,
@@ -2146,13 +2192,38 @@ static int altr_edac_a10_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
-	edac->sb_irq = platform_get_irq(pdev, 0);
-	if (edac->sb_irq < 0)
-		return edac->sb_irq;
+	if (edac->is_agilex5) {
+		rc = altr_agilex5_get_named_irqs(pdev, edac);
+		if (rc)
+			return rc;
+
+		edac->sb_irq = edac->agilex5_irqs[ALTR_AGILEX5_IRQ_GLOBAL_SBE];
+	} else {
+		edac->sb_irq = platform_get_irq(pdev, 0);
+		if (edac->sb_irq < 0)
+			return edac->sb_irq;
+	}
 
 	irq_set_chained_handler_and_data(edac->sb_irq,
 					 altr_edac_a10_irq_handler,
 					 edac);
+
+	/*
+	 * Unlike Stratix10/Agilex7 (which deliver uncorrectable errors as
+	 * Asynchronous SError), Agilex5 routes the global double-bit error
+	 * through a dedicated SPI ("global_dbe"). Hook it into the same
+	 * chained handler so the existing sb_irq/db_irq demux in
+	 * altr_edac_a10_irq_handler() routes DBE events through the manager's
+	 * IRQ domain. The panic notifier below is still registered as a
+	 * fall-back for any DBEs that escape to SError.
+	 */
+	if (edac->is_agilex5 &&
+	    edac->agilex5_irqs[ALTR_AGILEX5_IRQ_GLOBAL_DBE] >= 0) {
+		edac->db_irq = edac->agilex5_irqs[ALTR_AGILEX5_IRQ_GLOBAL_DBE];
+		irq_set_chained_handler_and_data(edac->db_irq,
+						 altr_edac_a10_irq_handler,
+						 edac);
+	}
 
 #ifdef CONFIG_64BIT
 	{
@@ -2208,6 +2279,7 @@ static int altr_edac_a10_probe(struct platform_device *pdev)
 static const struct of_device_id altr_edac_a10_of_match[] = {
 	{ .compatible = "altr,socfpga-a10-ecc-manager" },
 	{ .compatible = "altr,socfpga-s10-ecc-manager" },
+	{ .compatible = "altr,socfpga-agilex5-ecc-manager" },
 	{},
 };
 MODULE_DEVICE_TABLE(of, altr_edac_a10_of_match);
