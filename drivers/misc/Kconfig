@@ -644,6 +644,20 @@ config MCHP_LAN966X_PCI
 	    - lan966x-miim (MDIO_MSCC_MIIM)
 	    - lan966x-switch (LAN966X_SWITCH)
 
+config ALTERA_SOCFPGA_FCS
+	tristate "Altera FPGA FCS configuration support"
+	depends on INTEL_STRATIX10_SERVICE
+	help
+	  Altera SoCFPGA FPGA Crypto Service (FCS) configuration driver.
+
+	  It exposes the FCS security features reached through the Arm
+	  Trusted Firmware FCS service (via the stratix10-svc mailbox) as
+	  sysfs attributes under /sys/fcs_sysfs. Currently it provides the
+	  SDOS (Secure Data Object Service) owner-key derived AES
+	  encrypt/decrypt operation and its crypto session lifecycle, as
+	  used by the userspace fcs_client -E/--aes_encrypt and
+	  -D/--aes_decrypt commands.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"

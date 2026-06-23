@@ -75,3 +75,5 @@ obj-$(CONFIG_MCHP_LAN966X_PCI)	+= lan966x-pci.o
 obj-y				+= keba/
 obj-y				+= amd-sbi/
 obj-$(CONFIG_MISC_RP1)		+= rp1/
+obj-$(CONFIG_ALTERA_SOCFPGA_FCS) += altera-fcs-config.o
+altera-fcs-config-y := socfpga-fcs-config.o socfpga-fcs-plat.o socfpga-fcs-hal.o
