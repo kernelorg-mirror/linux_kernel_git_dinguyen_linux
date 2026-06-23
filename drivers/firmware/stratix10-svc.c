@@ -487,6 +487,12 @@ static void svc_thread_recv_status_ok(struct stratix10_svc_data *p_data,
 		cb_data->kaddr1 = &res.a1;
 		cb_data->kaddr2 = &res.a2;
 		break;
+	case COMMAND_SMC_ATF_BUILD_VER:
+		cb_data->status = BIT(SVC_STATUS_OK);
+		cb_data->kaddr1 = &res.a1;
+		cb_data->kaddr2 = &res.a2;
+		cb_data->kaddr3 = &res.a3;
+		break;
 	case COMMAND_RSU_DCMF_VERSION:
 		cb_data->status = BIT(SVC_STATUS_OK);
 		cb_data->kaddr1 = &res.a1;
@@ -705,6 +711,12 @@ static int svc_normal_to_secure_thread(void *data)
 			a0 = INTEL_SIP_SMC_SVC_VERSION;
 			a1 = 0;
 			a2 = 0;
+			break;
+		case COMMAND_SMC_ATF_BUILD_VER:
+			a0 = INTEL_SIP_SMC_ATF_BUILD_VER;
+			a1 = 0;
+			a2 = 0;
+			a3 = 0;
 			break;
 		case COMMAND_MBOX_SEND_CMD:
 			a0 = INTEL_SIP_SMC_MBOX_SEND_CMD;
@@ -1264,6 +1276,7 @@ int stratix10_svc_async_send(struct stratix10_svc_chan *chan, void *msg,
 	struct stratix10_svc_controller *ctrl;
 	struct stratix10_async_ctrl *actrl;
 	struct stratix10_async_chan *achan;
+	struct stratix10_svc_data_mem *pmem;
 	int ret = 0;
 
 	if (!chan || !msg || !handler)
@@ -1307,6 +1320,26 @@ int stratix10_svc_async_send(struct stratix10_svc_chan *chan, void *msg,
 		STRATIX10_SIP_SMC_SET_TRANSACTIONID_X1(handle->transaction_id);
 
 	switch (p_msg->command) {
+	case COMMAND_FCS_CRYPTO_OPEN_SESSION:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_OPEN_CS_SESSION;
+		break;
+	case COMMAND_FCS_CRYPTO_CLOSE_SESSION:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_CLOSE_CS_SESSION;
+		args.a2 = p_msg->arg[0];
+		break;
+	case COMMAND_FCS_SDOS_DATA_EXT:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_CRYPTION_EXT;
+		args.a2 = p_msg->arg[0];
+		args.a3 = p_msg->arg[1];
+		args.a4 = p_msg->arg[2];
+		args.a5 = pmem->paddr;
+		args.a6 = p_msg->payload_length;
+		args.a7 = pmem->paddr;
+		args.a8 = p_msg->payload_length_output;
+		args.a9 = p_msg->arg[3];
+		args.a10 = pmem->paddr;
+		args.a11 = pmem->paddr;
+		break;
 	case COMMAND_RSU_GET_SPT_TABLE:
 		args.a0 = INTEL_SIP_SMC_ASYNC_RSU_GET_SPT;
 		break;
@@ -1396,6 +1429,9 @@ static int stratix10_svc_async_prepare_response(struct stratix10_svc_chan *chan,
 	data->status = STRATIX10_GET_SDM_STATUS_CODE(handle->res.a1);
 
 	switch (p_msg->command) {
+	case COMMAND_FCS_CRYPTO_OPEN_SESSION:
+	case COMMAND_FCS_CRYPTO_CLOSE_SESSION:
+	case COMMAND_FCS_SDOS_DATA_EXT:
 	case COMMAND_RSU_NOTIFY:
 		break;
 	case COMMAND_RSU_GET_SPT_TABLE:
@@ -1896,6 +1932,7 @@ EXPORT_SYMBOL_GPL(stratix10_svc_free_memory);
 static const struct of_device_id stratix10_svc_drv_match[] = {
 	{.compatible = "intel,stratix10-svc"},
 	{.compatible = "intel,agilex-svc"},
+	{.compatible = "intel,agilex5-svc"},
 	{},
 };
 

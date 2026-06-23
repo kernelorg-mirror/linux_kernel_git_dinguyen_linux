@@ -154,6 +154,9 @@ struct stratix10_svc_chan;
  *
  * @COMMAND_HWMON_READVOLT: query the voltage from the hardware monitor,
  * return status is SVC_STATUS_OK or SVC_STATUS_ERROR
+ *
+ * @COMMAND_SMC_ATF_BUILD_VER: Non-mailbox SMC ATF Build Version,
+ * return status is SVC_STATUS_OK
  */
 enum stratix10_svc_command_code {
 	/* for FPGA */
@@ -181,13 +184,19 @@ enum stratix10_svc_command_code {
 	COMMAND_FCS_RANDOM_NUMBER_GEN,
 	/* for general status poll */
 	COMMAND_POLL_SERVICE_STATUS = 40,
+	/* for crypto service */
+	COMMAND_FCS_CRYPTO_OPEN_SESSION = 50,
+	COMMAND_FCS_CRYPTO_CLOSE_SESSION,
+	/* for extended SDOS encrypt/decrypt */
+	COMMAND_FCS_SDOS_DATA_EXT = 82,
 	/* for generic mailbox send command */
 	COMMAND_MBOX_SEND_CMD = 100,
 	/* Non-mailbox SMC Call */
 	COMMAND_SMC_SVC_VERSION = 200,
 	/* for HWMON */
 	COMMAND_HWMON_READTEMP,
-	COMMAND_HWMON_READVOLT
+	COMMAND_HWMON_READVOLT,
+	COMMAND_SMC_ATF_BUILD_VER
 };
 
 /**
@@ -205,7 +214,7 @@ struct stratix10_svc_client_msg {
 	void *payload_output;
 	size_t payload_length_output;
 	enum stratix10_svc_command_code command;
-	u64 arg[3];
+	u64 arg[4];
 };
 
 /**
