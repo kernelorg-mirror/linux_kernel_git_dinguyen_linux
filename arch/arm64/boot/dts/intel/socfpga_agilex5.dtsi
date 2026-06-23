@@ -86,6 +86,10 @@
 			memory-region = <&service_reserved>;
 			iommus = <&smmu 10>;
 		};
+
+		fcs_config: fcs-config {
+			compatible = "intel,agilex5-soc-fcs-config";
+		};
 	};
 
 	psci {
