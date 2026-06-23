@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/misc/intel,agilex5-soc-fcs-config.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Altera SoC FPGA Crypto Service (FCS)
+
+maintainers:
+  - Genevieve Chan <genevieve.chan@altera.com>
+  - Hang Suan Wang <hang.suan.wang@altera.com>
+
+description: |
+  The FPGA Crypto Service (FCS) is the umbrella for the SDM's runtime
+  crypto-service mailbox commands (random number generation, AES
+  encrypt/decrypt, HMAC/SHA, key management, attestation, and more).
+  The HPS does not access the SDM directly; requests are channelled
+  through EL3 (Arm Trusted Firmware) using SIP SMC calls and surfaced to
+  Linux by the stratix10-svc service layer. It represents the FCS
+  sub-service of the SDM and must be a child of the service layer ("svc")
+  node, mirroring the other SDM sub-service nodes such as the FPGA manager
+  and RSU. The compatible string selects the SoC generation, because the
+  FCS   mailbox command set and buffer addressing (for example service-SMMU
+  remapping) differ between SoCFPGA families.
+
+properties:
+  compatible:
+    enum:
+      - intel,agilex5-soc-fcs-config
+
+additionalProperties: false
+
+required:
+  - compatible
+
+examples:
+  - |
+    fcs_config: fcs-config {
+      compatible = "intel,agilex5-soc-fcs-config";
+    };
