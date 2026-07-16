@@ -351,6 +351,12 @@ struct altr_sdram_mc_data {
 #define ECC_READ_EOVR                     0x2
 #define ECC_READ_EDOVR                    0x3
 
+enum altr_platform_idx {
+	SOCFPGA_A10,
+	SOCFPGA_S10,
+	SOCFPGA_AGILEX5
+};
+
 struct altr_edac_device_dev;
 
 struct edac_device_prv_data {
@@ -394,7 +400,7 @@ struct altr_arria10_edac {
 	struct irq_chip		irq_chip;
 	struct list_head	a10_ecc_devices;
 	struct notifier_block	panic_notifier;
-	bool is_s10;
+	unsigned long		flag;
 };
 
 #endif	/* #ifndef _ALTERA_EDAC_H */
