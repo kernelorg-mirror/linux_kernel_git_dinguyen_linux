@@ -710,8 +710,17 @@ static int altr_edac_device_probe(struct platform_device *pdev)
 	struct resource *r;
 	int res = 0;
 	struct device_node *np = pdev->dev.of_node;
-	char *ecc_name = (char *)np->name;
+	const struct of_device_id *edac_dev_match;
+	char *ecc_name;
 	static int dev_instance;
+
+	if (!np) {
+		edac_printk(KERN_ERR, EDAC_DEVICE,
+			    "Unable to get device tree node\n");
+		return -ENODEV;
+	}
+
+	ecc_name = (char *)np->name;
 
 	if (!devres_open_group(&pdev->dev, NULL, GFP_KERNEL)) {
 		edac_printk(KERN_ERR, EDAC_DEVICE,
@@ -757,7 +766,14 @@ static int altr_edac_device_probe(struct platform_device *pdev)
 	}
 
 	/* Get driver specific data for this EDAC device */
-	drvdata->data = of_match_node(altr_edac_device_of_match, np)->data;
+	edac_dev_match = of_match_node(altr_edac_device_of_match, np);
+	if (!edac_dev_match) {
+		edac_printk(KERN_ERR, EDAC_DEVICE,
+			    "%s: Unable to match device\n", ecc_name);
+		res = -ENODEV;
+		goto fail1;
+	}
+	drvdata->data = edac_dev_match->data;
 
 	/* Check specific dependencies for the module */
 	if (drvdata->data->setup) {
