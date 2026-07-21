@@ -256,28 +256,45 @@ patternProperties:
       - interrupts
       - altr,ecc-parent
 
-if:
-  properties:
-    compatible:
-      contains:
-        const: altr,socfpga-ecc-manager
-then:
-  required:
-    - compatible
-    - "#address-cells"
-    - "#size-cells"
-    - ranges
+allOf:
+  - if:
+      properties:
+        compatible:
+          contains:
+            const: altr,socfpga-ecc-manager
+    then:
+      required:
+        - compatible
+        - "#address-cells"
+        - "#size-cells"
+        - ranges
 
-else:
-  required:
-    - compatible
-    - "#address-cells"
-    - "#size-cells"
-    - interrupts
-    - interrupt-controller
-    - "#interrupt-cells"
-    - ranges
-    - altr,sysmgr-syscon
+    else:
+      required:
+        - compatible
+        - "#address-cells"
+        - "#size-cells"
+        - interrupts
+        - interrupt-controller
+        - "#interrupt-cells"
+        - ranges
+        - altr,sysmgr-syscon
+
+  - if:
+      properties:
+        compatible:
+          contains:
+           const: altr,socfpga-agilex5-ecc-manager
+    then:
+      properties:
+        interrupts:
+          maxItems: 7
+      required:
+        - reset-names
+    else:
+      properties:
+        interrupts:
+          maxItems: 2
 
 additionalProperties: false
 
