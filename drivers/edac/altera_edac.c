@@ -300,6 +300,10 @@ static int altr_sdram_probe(struct platform_device *pdev)
 
 	/* Check specific dependencies for the module */
 	priv = device_get_match_data(&pdev->dev);
+	if (!priv) {
+		edac_printk(KERN_ERR, EDAC_MC, "No match data found\n");
+		return -ENODEV;
+	}
 
 	/* Validate the SDRAM controller has ECC enabled */
 	if (regmap_read(mc_vbase, priv->ecc_ctrl_offset, &read_reg) ||
