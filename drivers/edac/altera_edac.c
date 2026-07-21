@@ -300,6 +300,10 @@ static int altr_sdram_probe(struct platform_device *pdev)
 
 	/* Check specific dependencies for the module */
 	priv = device_get_match_data(&pdev->dev);
+	if (!priv) {
+		edac_printk(KERN_ERR, EDAC_MC, "No match data found\n");
+		return -ENODEV;
+	}
 
 	/* Validate the SDRAM controller has ECC enabled */
 	if (regmap_read(mc_vbase, priv->ecc_ctrl_offset, &read_reg) ||
@@ -766,6 +770,11 @@ static int altr_edac_device_probe(struct platform_device *pdev)
 
 	/* Get driver specific data for this EDAC device */
 	drvdata->data = of_match_node(altr_edac_device_of_match, np)->data;
+	if (!drvdata->data) {
+		edac_printk(KERN_ERR, EDAC_DEVICE,
+			    "%s: Failed to get matching of_match struct\n", ecc_name);
+		goto fail1;
+	}
 
 	/* Check specific dependencies for the module */
 	if (drvdata->data->setup) {
