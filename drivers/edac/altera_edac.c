@@ -2238,6 +2238,28 @@ static int altr_edac_a10_probe(struct platform_device *pdev)
 	return 0;
 }
 
+static void altr_edac_a10_remove(struct platform_device *pdev)
+{
+	struct altr_arria10_edac *edac = platform_get_drvdata(pdev);
+	struct altr_edac_device_dev *altdev, *tmp;
+
+	list_for_each_entry_safe(altdev, tmp, &edac->a10_ecc_devices, next) {
+		debugfs_remove_recursive(altdev->debugfs_dir);
+		edac_device_del_device(altdev->edac_dev->dev);
+		edac_device_free_ctl_info(altdev->edac_dev);
+		list_del(&altdev->next);
+	}
+
+	irq_set_chained_handler_and_data(edac->sb_irq, NULL, NULL);
+	if (edac->is_s10)
+		atomic_notifier_chain_unregister(&panic_notifier_list,
+						 &edac->panic_notifier);
+	else
+		irq_set_chained_handler_and_data(edac->db_irq, NULL, NULL);
+
+	irq_domain_remove(edac->domain);
+}
+
 static const struct of_device_id altr_edac_a10_of_match[] = {
 	{ .compatible = "altr,socfpga-a10-ecc-manager" },
 	{ .compatible = "altr,socfpga-s10-ecc-manager", .data = (void *)1 },
@@ -2247,6 +2269,7 @@ MODULE_DEVICE_TABLE(of, altr_edac_a10_of_match);
 
 static struct platform_driver altr_edac_a10_driver = {
 	.probe =  altr_edac_a10_probe,
+	.remove = altr_edac_a10_remove,
 	.driver = {
 		.name = "socfpga_a10_ecc_manager",
 		.of_match_table = altr_edac_a10_of_match,
