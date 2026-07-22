@@ -2115,6 +2115,9 @@ static int s10_edac_dberr_handler(struct notifier_block *this,
 		list_for_each(position, &edac->a10_ecc_devices) {
 			ed = list_entry(position, struct altr_edac_device_dev,
 					next);
+			/* Avoid undefined shift when db_irq exceeds BIT() width */
+			if (ed->db_irq >= BITS_PER_LONG)
+				continue;
 			if (!(BIT(ed->db_irq) & dberror))
 				continue;
 
