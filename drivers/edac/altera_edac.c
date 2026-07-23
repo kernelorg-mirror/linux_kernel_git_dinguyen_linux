@@ -701,7 +701,7 @@ MODULE_DEVICE_TABLE(of, altr_edac_device_of_match);
  */
 static int altr_edac_device_probe(struct platform_device *pdev)
 {
-	struct edac_device_ctl_info *dci;
+	struct edac_device_ctl_info *dci = NULL;
 	struct altr_edac_device_dev *drvdata;
 	struct resource *r;
 	int res = 0;
@@ -729,7 +729,7 @@ static int altr_edac_device_probe(struct platform_device *pdev)
 		edac_printk(KERN_ERR, EDAC_DEVICE,
 			    "Unable to get mem resource\n");
 		res = -ENODEV;
-		goto fail;
+		goto fail1;
 	}
 
 	if (!devm_request_mem_region(&pdev->dev, r->start, resource_size(r),
@@ -737,7 +737,7 @@ static int altr_edac_device_probe(struct platform_device *pdev)
 		edac_printk(KERN_ERR, EDAC_DEVICE,
 			    "%s:Error requesting mem region\n", ecc_name);
 		res = -EBUSY;
-		goto fail;
+		goto fail1;
 	}
 
 	dci = edac_device_alloc_ctl_info(sizeof(*drvdata), ecc_name,
@@ -747,7 +747,7 @@ static int altr_edac_device_probe(struct platform_device *pdev)
 		edac_printk(KERN_ERR, EDAC_DEVICE,
 			    "%s: Unable to allocate EDAC device\n", ecc_name);
 		res = -ENOMEM;
-		goto fail;
+		goto fail1;
 	}
 
 	drvdata = dci->pvt_info;
@@ -806,9 +806,9 @@ static int altr_edac_device_probe(struct platform_device *pdev)
 	return 0;
 
 fail1:
-	edac_device_free_ctl_info(dci);
-fail:
 	devres_release_group(&pdev->dev, NULL);
+	if (dci)
+		edac_device_free_ctl_info(dci);
 	edac_printk(KERN_ERR, EDAC_DEVICE,
 		    "%s:Error setting up EDAC device: %d\n", ecc_name, res);
 
