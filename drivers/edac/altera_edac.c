@@ -2209,6 +2209,8 @@ static int altr_edac_a10_probe(struct platform_device *pdev)
 	} else {
 		edac->db_irq = platform_get_irq(pdev, 1);
 		if (edac->db_irq < 0) {
+			irq_set_chained_handler_and_data(edac->sb_irq,
+							 NULL, NULL);
 			irq_domain_remove(edac->domain);
 			return edac->db_irq;
 		}
