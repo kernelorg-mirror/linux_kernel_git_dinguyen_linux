@@ -930,6 +930,18 @@ static int __maybe_unused altr_init_memory_port(void __iomem *ioaddr, int port)
 		clear_mask = ALTR_A10_ECC_ERRPENA_MASK;
 	}
 
+	/*
+	 * The HW init block clears the entire memory and ECC data, so only
+	 * run it once. If initialization already completed (e.g. on an
+	 * earlier probe or in the bootloader), skip it so a re-probe caused
+	 * by deferred probing or a rebind does not wipe an active peripheral.
+	 */
+	if (ecc_test_bits(stat_mask, (ioaddr + ALTR_A10_ECC_INITSTAT_OFST))) {
+		/* Clear any pending ECC interrupts */
+		writel(clear_mask, (ioaddr + ALTR_A10_ECC_INTSTAT_OFST));
+		return 0;
+	}
+
 	ecc_set_bits(init_mask, (ioaddr + ALTR_A10_ECC_CTRL_OFST));
 	while (limit--) {
 		if (ecc_test_bits(stat_mask,
