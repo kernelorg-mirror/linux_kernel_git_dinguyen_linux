@@ -5,17 +5,19 @@
  *
  * Modified from mach-picoxcell/time.c
  */
+#include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/dw_apb_timer.h>
+#include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/of_irq.h>
-#include <linux/clk.h>
+#include <linux/platform_device.h>
 #include <linux/reset.h>
 #include <linux/sched_clock.h>
 
-static int __init timer_get_base_and_rate(struct device_node *np,
-				    void __iomem **base, u32 *rate)
+static int timer_get_base_and_rate(struct device_node *np,
+				   void __iomem **base, u32 *rate)
 {
 	struct clk *timer_clk;
 	struct clk *pclk;
@@ -32,20 +34,30 @@ static int __init timer_get_base_and_rate(struct device_node *np,
 	 * out the state the firmware may have left it
 	 */
 	rstc = of_reset_control_get(np, NULL);
-	if (!IS_ERR(rstc)) {
+	if (IS_ERR(rstc)) {
+		if (PTR_ERR(rstc) == -EPROBE_DEFER) {
+			iounmap(*base);
+			return -EPROBE_DEFER;
+		}
+	} else {
 		reset_control_assert(rstc);
 		reset_control_deassert(rstc);
+		reset_control_put(rstc);
 	}
 
 	/*
 	 * Not all implementations use a peripheral clock, so don't panic
-	 * if it's not present
+	 * if it's not present. Defer if the clock provider is not ready.
 	 */
 	pclk = of_clk_get_by_name(np, "pclk");
-	if (!IS_ERR(pclk))
-		if (clk_prepare_enable(pclk))
-			pr_warn("pclk for %pOFn is present, but could not be activated\n",
-				np);
+	if (IS_ERR(pclk)) {
+		ret = PTR_ERR(pclk);
+		if (ret == -EPROBE_DEFER)
+			goto out_pclk_disable;
+	} else if (clk_prepare_enable(pclk)) {
+		pr_warn("pclk for %pOFn is present, but could not be activated\n",
+			np);
+	}
 
 	if (!of_property_read_u32(np, "clock-freq", rate) ||
 	    !of_property_read_u32(np, "clock-frequency", rate))
@@ -82,7 +94,7 @@ out_pclk_disable:
 	return ret;
 }
 
-static int __init add_clockevent(struct device_node *event_timer)
+static int add_clockevent(struct device_node *event_timer)
 {
 	void __iomem *iobase;
 	struct dw_apb_clock_event_device *ced;
@@ -110,7 +122,7 @@ static int __init add_clockevent(struct device_node *event_timer)
 static void __iomem *sched_io_base;
 static u32 sched_rate;
 
-static int __init add_clocksource(struct device_node *source_timer)
+static int add_clocksource(struct device_node *source_timer)
 {
 	void __iomem *iobase;
 	struct dw_apb_clocksource *cs;
@@ -144,12 +156,12 @@ static u64 notrace read_sched_clock(void)
 	return ~readl_relaxed(sched_io_base);
 }
 
-static const struct of_device_id sptimer_ids[] __initconst = {
+static const struct of_device_id sptimer_ids[] = {
 	{ .compatible = "picochip,pc3x2-rtc" },
 	{ /* Sentinel */ },
 };
 
-static void __init init_sched_clock(void)
+static void init_sched_clock(void)
 {
 	struct device_node *sched_timer;
 
@@ -175,7 +187,7 @@ static struct delay_timer dw_apb_delay_timer = {
 #endif
 
 static int num_called;
-static int __init dw_apb_timer_init(struct device_node *timer)
+static int dw_apb_timer_init(struct device_node *timer)
 {
 	int ret = 0;
 
@@ -201,9 +213,43 @@ static int __init dw_apb_timer_init(struct device_node *timer)
 
 	num_called++;
 
+	/*
+	 * Mark the node populated so of_platform_populate() will not create a
+	 * device for an instance that already initialized from TIMER_OF_DECLARE.
+	 */
+	of_node_set_flag(timer, OF_POPULATED);
+
 	return 0;
 }
 TIMER_OF_DECLARE(pc3x2_timer, "picochip,pc3x2-timer", dw_apb_timer_init);
 TIMER_OF_DECLARE(apb_timer_osc, "snps,dw-apb-timer-osc", dw_apb_timer_init);
 TIMER_OF_DECLARE(apb_timer_sp, "snps,dw-apb-timer-sp", dw_apb_timer_init);
 TIMER_OF_DECLARE(apb_timer, "snps,dw-apb-timer", dw_apb_timer_init);
+
+/*
+ * TIMER_OF_DECLARE cannot retry after -EPROBE_DEFER. Register a platform
+ * driver so init is retried once the clock or reset provider is available.
+ */
+static int dw_apb_timer_probe(struct platform_device *pdev)
+{
+	return dw_apb_timer_init(pdev->dev.of_node);
+}
+
+static const struct of_device_id dw_apb_timer_of_match[] = {
+	{ .compatible = "picochip,pc3x2-timer" },
+	{ .compatible = "snps,dw-apb-timer-osc" },
+	{ .compatible = "snps,dw-apb-timer-sp" },
+	{ .compatible = "snps,dw-apb-timer" },
+	{ /* Sentinel */ },
+};
+MODULE_DEVICE_TABLE(of, dw_apb_timer_of_match);
+
+static struct platform_driver dw_apb_timer_driver = {
+	.probe	= dw_apb_timer_probe,
+	.driver	= {
+		.name		= "dw-apb-timer",
+		.of_match_table	= dw_apb_timer_of_match,
+		.suppress_bind_attrs = true,
+	},
+};
+builtin_platform_driver(dw_apb_timer_driver);
