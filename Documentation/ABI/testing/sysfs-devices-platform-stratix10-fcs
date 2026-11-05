@@ -1,0 +1,21 @@
+	Intel Stratix10 / Altera Agilex FPGA Crypto Service (FCS) device
+	attributes
+
+What:		/sys/devices/platform/stratix10-fcs.0/atf_version
+Date:		October 2026
+KernelVersion:	7.3
+Contact:	Hang Suan Wang <hang.suan.wang@altera.com>
+Contact:	Genevieve Chan <genevieve.chan@altera.com>
+Description:
+		(RO) Arm Trusted Firmware build version. The driver queries
+		it once through the stratix10-svc service layer while
+		probing, and every read returns that cached result.
+
+		The file contains three unsigned decimal numbers, the major,
+		minor and patch version, separated by dots and terminated by
+		a newline::
+
+			%u.%u.%u
+
+		A read fails with ENODATA when that probe-time query produced
+		no version.
