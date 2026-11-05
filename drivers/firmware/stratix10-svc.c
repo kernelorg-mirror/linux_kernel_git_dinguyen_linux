@@ -90,6 +90,7 @@
 
 /* stratix10 service layer clients */
 #define STRATIX10_RSU				"stratix10-rsu"
+#define STRATIX10_FCS				"stratix10-fcs"
 #define SOCFPGA_HWMON				"socfpga-hwmon"
 
 /* Maximum number of SDM client IDs. */
@@ -163,10 +164,12 @@ struct stratix10_svc_chan;
 /**
  * struct stratix10_svc - svc private data
  * @stratix10_svc_rsu: pointer to stratix10 RSU device
+ * @stratix10_svc_fcs: pointer to stratix10 FCS device
  * @stratix10_svc_hwmon: pointer to stratix10 HWMON device
  */
 struct stratix10_svc {
 	struct platform_device *stratix10_svc_rsu;
+	struct platform_device *stratix10_svc_fcs;
 	struct platform_device *stratix10_svc_hwmon;
 };
 
@@ -199,8 +202,10 @@ struct stratix10_svc_sh_memory {
  *         On the SMMU path this is (IOVA + %SVC_SDM_DMA_ADDR_OFFSET);
  *         on the gen_pool path this equals the raw physical address.
  * @size: size of memory
- * @dma_addr: IOVA returned by dma_alloc_coherent(); used to free the
- *            mapping via dma_free_coherent() on the SMMU path.
+ * @dma_addr: IOVA returned by the DMA allocator; used to release the
+ *            mapping again on the SMMU path.
+ * @attrs: DMA attributes the buffer was allocated with, passed back to
+ *         dma_free_attrs() so that the release matches the allocation.
  * @node: link list head node
  *
  * This struct is used in a list that keeps track of buffers which have
@@ -213,6 +218,7 @@ struct stratix10_svc_data_mem {
 	phys_addr_t paddr;
 	size_t size;
 	dma_addr_t dma_addr;
+	unsigned long attrs;
 	struct list_head node;
 };
 
@@ -324,6 +330,10 @@ struct stratix10_async_ctrl {
  * @svc_fifo_lock: protect access to service message data queue (locking pending fifo)
  * @lock: protect access to the channel
  * @async_chan: reference to asynchronous channel object for this channel
+ * @mem_contiguous: when true, buffers for this channel are allocated so that
+ *                  their physical address is reachable by the SDM, which is
+ *                  required by commands passing a physical address rather
+ *                  than an IOVA.
  *
  * This struct is used by service client to communicate with service layer.
  * Each service client has its own channel created by service controller.
@@ -337,6 +347,7 @@ struct stratix10_svc_chan {
 	spinlock_t svc_fifo_lock;
 	spinlock_t lock;
 	struct stratix10_async_chan *async_chan;
+	bool mem_contiguous;
 };
 
 /**
@@ -354,6 +365,8 @@ struct stratix10_svc_chan {
  * @psci_reboot_nb: reboot notifier for PSCI secondary CPU offlining
  * @use_dma_mem: when true, buffers are allocated via dma_alloc_coherent()
  *               instead of the ATF reserved-memory gen_pool.
+ * @domain: IOMMU domain the SDM-visible buffers are mapped into; used to
+ *          resolve a buffer's IOVA back to the physical address ATF expects.
  * @dma_addr_offset: value added to the DMA address (IOVA) before passing it
  *                   to ATF via SMC. ATF uses this offset to distinguish
  *                   SMMU-mapped buffers from direct physical addresses; it
@@ -379,6 +392,7 @@ struct stratix10_svc_controller {
 	struct stratix10_async_ctrl actrl;
 	struct notifier_block psci_reboot_nb;
 	bool use_dma_mem;
+	struct iommu_domain *domain;
 	unsigned long dma_addr_offset;
 	struct stratix10_svc_chan chans[] __counted_by(num_chans);
 };
@@ -412,6 +426,88 @@ static void *svc_pa_to_va(unsigned long addr)
 
 	/* address is not found */
 	return NULL;
+}
+
+/**
+ * svc_va_to_pa() - translate virtual address to physical address
+ * @ctrl: pointer to service layer controller
+ * @vaddr: buffer returned by stratix10_svc_allocate_memory()
+ *
+ * Provides the physical address arguments of an SMC call. On the SMMU path
+ * ATF expects the address backing the buffer's IOVA here, with the IOVA
+ * itself supplied separately by svc_va_to_iova(). The backing address is
+ * resolved through the device's IOMMU domain, since dma_alloc_coherent()
+ * returns a remapped virtual address that virt_to_phys() cannot translate.
+ * On the gen_pool path the stored address is already a physical address.
+ *
+ * The SDM can only reach a 32-bit physical address, so reject anything
+ * beyond that rather than letting the SDM fail the command later.
+ *
+ * Return: physical address of the buffer, or 0 if the provided virtual
+ * address doesn't exist or is not reachable by the SDM.
+ */
+static unsigned long svc_va_to_pa(struct stratix10_svc_controller *ctrl,
+				  void *vaddr)
+{
+	struct stratix10_svc_data_mem *pmem;
+	phys_addr_t pa;
+
+	if (!vaddr)
+		return 0;
+
+	guard(mutex)(&svc_mem_lock);
+	list_for_each_entry(pmem, &svc_data_mem, node) {
+		if (pmem->vaddr != vaddr)
+			continue;
+
+		if (!ctrl->use_dma_mem)
+			return pmem->paddr;
+
+		pa = iommu_iova_to_phys(ctrl->domain, pmem->dma_addr);
+		if (!pa || pa > U32_MAX) {
+			dev_err(ctrl->dev,
+				"payload %p resolved to %pa, which the SDM cannot reach\n",
+				vaddr, &pa);
+			return 0;
+		}
+
+		return pa;
+	}
+
+	dev_err(ctrl->dev, "payload %p is not a service layer buffer\n", vaddr);
+	return 0;
+}
+
+/**
+ * svc_va_to_iova() - translate virtual address to SMMU remapped address
+ * @ctrl: pointer to service layer controller
+ * @vaddr: buffer returned by stratix10_svc_allocate_memory()
+ *
+ * Provides the SMMU remapped address arguments of an SMC call. Without an
+ * SMMU there is no separate remapped address, and ATF expects these
+ * arguments to repeat the physical address.
+ *
+ * Return: IOVA of the buffer on the SMMU path, its physical address on the
+ * gen_pool path, or 0 if the provided virtual address doesn't exist.
+ */
+static unsigned long svc_va_to_iova(struct stratix10_svc_controller *ctrl,
+				    void *vaddr)
+{
+	struct stratix10_svc_data_mem *pmem;
+
+	if (!vaddr)
+		return 0;
+
+	guard(mutex)(&svc_mem_lock);
+	list_for_each_entry(pmem, &svc_data_mem, node) {
+		if (pmem->vaddr != vaddr)
+			continue;
+
+		return ctrl->use_dma_mem ? pmem->dma_addr : pmem->paddr;
+	}
+
+	dev_err(ctrl->dev, "payload %p is not a service layer buffer\n", vaddr);
+	return 0;
 }
 
 /**
@@ -1540,6 +1636,26 @@ int stratix10_svc_async_send(struct stratix10_svc_chan *chan, void *msg,
 		STRATIX10_SIP_SMC_SET_TRANSACTIONID_X1(handle->transaction_id);
 
 	switch (p_msg->command) {
+	case COMMAND_FCS_CRYPTO_OPEN_SESSION:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_OPEN_CS_SESSION;
+		break;
+	case COMMAND_FCS_CRYPTO_CLOSE_SESSION:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_CLOSE_CS_SESSION;
+		args.a2 = p_msg->arg[0];
+		break;
+	case COMMAND_FCS_SDOS_DATA_EXT:
+		args.a0 = INTEL_SIP_SMC_ASYNC_FCS_CRYPTION_EXT;
+		args.a2 = p_msg->arg[0];
+		args.a3 = p_msg->arg[1];
+		args.a4 = p_msg->arg[2];
+		args.a5 = svc_va_to_pa(ctrl, p_msg->payload);
+		args.a6 = p_msg->payload_length;
+		args.a7 = svc_va_to_pa(ctrl, p_msg->payload_output);
+		args.a8 = p_msg->payload_length_output;
+		args.a9 = p_msg->arg[3];
+		args.a10 = svc_va_to_iova(ctrl, p_msg->payload);
+		args.a11 = svc_va_to_iova(ctrl, p_msg->payload_output);
+		break;
 	case COMMAND_RSU_GET_SPT_TABLE:
 		args.a0 = INTEL_SIP_SMC_ASYNC_RSU_GET_SPT;
 		break;
@@ -1637,7 +1753,12 @@ static int stratix10_svc_async_prepare_response(struct stratix10_svc_chan *chan,
 	data->status = STRATIX10_GET_SDM_STATUS_CODE(handle->res.a1);
 
 	switch (p_msg->command) {
+	case COMMAND_FCS_CRYPTO_CLOSE_SESSION:
 	case COMMAND_RSU_NOTIFY:
+		break;
+	case COMMAND_FCS_CRYPTO_OPEN_SESSION:
+	case COMMAND_FCS_SDOS_DATA_EXT:
+		data->kaddr1 = (void *)&handle->res.a2;
 		break;
 	case COMMAND_RSU_GET_SPT_TABLE:
 		data->kaddr1 = (void *)&handle->res.a2;
@@ -2205,7 +2326,25 @@ void *stratix10_svc_allocate_memory(struct stratix10_svc_chan *chan,
 		return ERR_PTR(-ENOMEM);
 
 	if (ctrl->use_dma_mem) {
-		va = dma_alloc_coherent(ctrl->dev, size, &dma_addr, GFP_KERNEL);
+		pmem->attrs = 0;
+		if (chan->mem_contiguous) {
+			/*
+			 * Some SMC calls take a buffer's physical address and
+			 * its SMMU remapped address in separate arguments, and
+			 * the SDM has to reach the physical one (see
+			 * INTEL_SIP_SMC_ASYNC_FCS_CRYPTION_EXT). The default
+			 * allocator path adds __GFP_HIGHMEM, so route the
+			 * allocation through CMA instead, which arm64 reserves
+			 * below the DMA zone limit.
+			 */
+			if (size <= PAGE_SIZE)
+				size = PAGE_SIZE * 2;
+			pmem->attrs = DMA_ATTR_FORCE_CONTIGUOUS;
+			va = dma_alloc_attrs(ctrl->dev, size, &dma_addr, GFP_KERNEL,
+					     pmem->attrs);
+		} else {
+			va = dma_alloc_coherent(ctrl->dev, size, &dma_addr, GFP_KERNEL);
+		}
 		if (!va) {
 			kfree(pmem);
 			return ERR_PTR(-ENOMEM);
@@ -2259,8 +2398,8 @@ void stratix10_svc_free_memory(struct stratix10_svc_chan *chan, void *kaddr)
 			continue;
 
 		if (ctrl->use_dma_mem) {
-			dma_free_coherent(ctrl->dev, pmem->size,
-					  pmem->vaddr, pmem->dma_addr);
+			dma_free_attrs(ctrl->dev, pmem->size, pmem->vaddr,
+				       pmem->dma_addr, pmem->attrs);
 		} else {
 			gen_pool_free(ctrl->genpool,
 				      (unsigned long)kaddr, pmem->size);
@@ -2351,8 +2490,8 @@ static void svc_data_mem_cleanup(void *data)
 		dev_warn(ctrl->dev, "leaked svc buffer %p, freeing on unbind\n",
 			 pmem->vaddr);
 		if (ctrl->use_dma_mem) {
-			dma_free_coherent(ctrl->dev, pmem->size,
-					  pmem->vaddr, pmem->dma_addr);
+			dma_free_attrs(ctrl->dev, pmem->size, pmem->vaddr,
+				       pmem->dma_addr, pmem->attrs);
 		} else {
 			gen_pool_free(ctrl->genpool,
 				      (unsigned long)pmem->vaddr, pmem->size);
@@ -2434,6 +2573,8 @@ static int stratix10_svc_drv_probe(struct platform_device *pdev)
 	init_completion(&controller->complete_status);
 
 	if (use_dma_mem) {
+		controller->domain = iommu_get_domain_for_dev(dev);
+
 		ret = devm_add_action_or_reset(dev, svc_data_mem_cleanup, controller);
 		if (ret)
 			goto err_destroy_pool;
@@ -2469,6 +2610,8 @@ static int stratix10_svc_drv_probe(struct platform_device *pdev)
 		controller->chans[i].scl = NULL;
 		controller->chans[i].ctrl = controller;
 		controller->chans[i].name = (char *)chan_names[i];
+		controller->chans[i].mem_contiguous =
+			!strcmp(controller->chans[i].name, SVC_CLIENT_FCS);
 		spin_lock_init(&controller->chans[i].lock);
 		ret = kfifo_alloc(&controller->chans[i].svc_fifo, fifo_size, GFP_KERNEL);
 		if (ret) {
@@ -2496,9 +2639,20 @@ static int stratix10_svc_drv_probe(struct platform_device *pdev)
 		goto err_free_fifos;
 	}
 
+	svc->stratix10_svc_fcs = platform_device_alloc(STRATIX10_FCS, 0);
+	if (!svc->stratix10_svc_fcs) {
+		dev_err(dev, "failed to allocate %s device\n", STRATIX10_FCS);
+		ret = -ENOMEM;
+		goto err_unregister_clients;
+	}
+
 	ret = platform_device_add(svc->stratix10_svc_rsu);
 	if (ret)
-		goto err_put_device;
+		goto err_put_rsu;
+
+	ret = platform_device_add(svc->stratix10_svc_fcs);
+	if (ret)
+		goto err_put_fcs;
 
 	if (IS_ENABLED(CONFIG_SENSORS_ALTERA_SOCFPGA_HWMON)) {
 		svc->stratix10_svc_hwmon =
@@ -2532,9 +2686,13 @@ err_unregister_clients:
 		platform_device_unregister(svc->stratix10_svc_hwmon);
 	if (svc->stratix10_svc_rsu)
 		platform_device_unregister(svc->stratix10_svc_rsu);
+	if (svc->stratix10_svc_fcs)
+		platform_device_unregister(svc->stratix10_svc_fcs);
 	goto err_free_fifos;
-err_put_device:
+err_put_rsu:
 	platform_device_put(svc->stratix10_svc_rsu);
+err_put_fcs:
+	platform_device_put(svc->stratix10_svc_fcs);
 err_free_fifos:
 	/* only remove from list if list_add_tail() was reached */
 	if (!list_empty(&controller->node))
@@ -2561,6 +2719,8 @@ static void stratix10_svc_drv_remove(struct platform_device *pdev)
 	platform_device_unregister(svc->stratix10_svc_rsu);
 	if (svc->stratix10_svc_hwmon)
 		platform_device_unregister(svc->stratix10_svc_hwmon);
+	if (svc->stratix10_svc_fcs)
+		platform_device_unregister(svc->stratix10_svc_fcs);
 
 	psci_cpu_off_teardown(ctrl);
 
